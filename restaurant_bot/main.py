@@ -163,15 +163,15 @@ async def run_agent(message):
                         response = ""
 
         except InputGuardrailTripwireTriggered:
-            st.write("I can't help you with that.")
+            st.warning("⚠️ 죄송합니다. 해당 내용은 저희 서비스 범위를 벗어나는 요청이에요. 메뉴, 주문, 예약, 불만 접수 관련 질문을 도와드릴게요! 😊")
 
         except OutputGuardrailTripwireTriggered:
-            st.write("I can't show you that answer.")
+            st.warning("⚠️ 죄송합니다. 해당 답변은 제공해 드리기 어렵습니다. 다른 방식으로 질문해 주시면 최선을 다해 도와드릴게요! 🙏")
             st.session_state["text_placeholder"].empty()
 
 
 message = st.chat_input(
-    "Write a message for your assistant",
+    "무엇을 도와드릴까요? 메뉴 안내, 주문, 예약, 불만 접수 모두 가능합니다 🐖",
 )
 
 if message:
