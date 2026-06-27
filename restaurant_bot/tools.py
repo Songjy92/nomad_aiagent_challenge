@@ -98,9 +98,25 @@ MENU_DATABASE = {
     }
 }
 
-ORDERS_STORE = {}
-RESERVATIONS_STORE = {}
-COMPLAINTS_STORE = {}
+def _orders() -> dict:
+    """주문 데이터를 현재 사용자의 session_state에서 반환합니다."""
+    if "orders_store" not in st.session_state:
+        st.session_state["orders_store"] = {}
+    return st.session_state["orders_store"]
+
+
+def _reservations() -> dict:
+    """예약 데이터를 현재 사용자의 session_state에서 반환합니다."""
+    if "reservations_store" not in st.session_state:
+        st.session_state["reservations_store"] = {}
+    return st.session_state["reservations_store"]
+
+
+def _complaints() -> dict:
+    """민원 데이터를 현재 사용자의 session_state에서 반환합니다."""
+    if "complaints_store" not in st.session_state:
+        st.session_state["complaints_store"] = {}
+    return st.session_state["complaints_store"]
 
 # =============================================================================
 # MENU AGENT TOOLS
@@ -215,7 +231,7 @@ def place_order(context: UserAccountContext, items: list[OrderItem]) -> str:
     }
     
     # Store order
-    ORDERS_STORE[order_id] = order_data
+    _orders()[order_id] = order_data
 
     prep_time = 15 if context.tier != "basic" else 25 # Premium perk: priority queue
 
@@ -241,10 +257,10 @@ def get_order_status(context: UserAccountContext, order_id: str) -> str:
         order_id: The unique Order ID (e.g., ORD-12345)
     """
     o_id = order_id.strip().upper()
-    if o_id not in ORDERS_STORE:
+    if o_id not in _orders():
         return f"❌ Order ID '{order_id}' not found. Please double check the ID."
 
-    order = ORDERS_STORE[o_id]
+    order = _orders()[o_id]
     
     items_display_str = ", ".join([f"{item['name']} x{item['quantity']}" for item in order['items']])
 
@@ -268,10 +284,10 @@ def add_to_order(context: UserAccountContext, order_id: str, items: list[OrderIt
         items: List of additional items to order with their quantities
     """
     o_id = order_id.strip().upper()
-    if o_id not in ORDERS_STORE:
+    if o_id not in _orders():
         return f"❌ Order ID '{order_id}' not found. Please double check the ID."
 
-    order = ORDERS_STORE[o_id]
+    order = _orders()[o_id]
     if order["status"] == "cancelled":
         return f"❌ Cannot add items. Order '{o_id}' has already been cancelled."
         
@@ -348,10 +364,10 @@ def cancel_order(context: UserAccountContext, order_id: str) -> str:
         order_id: The unique Order ID (e.g., ORD-12345)
     """
     o_id = order_id.strip().upper()
-    if o_id not in ORDERS_STORE:
+    if o_id not in _orders():
         return f"❌ Order ID '{order_id}' not found."
 
-    order = ORDERS_STORE[o_id]
+    order = _orders()[o_id]
     if order["status"] == "cancelled":
         return f"⚠️ Order '{o_id}' is already cancelled."
         
@@ -425,7 +441,7 @@ def make_reservation(context: UserAccountContext, date: str, time: str, guests: 
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    RESERVATIONS_STORE[res_id] = res_data
+    _reservations()[res_id] = res_data
     
     table_type = "Window VIP Table" if context.tier != "basic" else "Standard Table"
 
@@ -449,10 +465,10 @@ def get_reservation_details(context: UserAccountContext, reservation_id: str) ->
         reservation_id: The unique Reservation ID (e.g., RES-12345)
     """
     r_id = reservation_id.strip().upper()
-    if r_id not in RESERVATIONS_STORE:
+    if r_id not in _reservations():
         return f"❌ Reservation ID '{reservation_id}' not found."
 
-    res = RESERVATIONS_STORE[r_id]
+    res = _reservations()[r_id]
     return f"""
 🔍 **Reservation Info: {r_id}**
 👤 **Customer Name:** {res['customer_name']}
@@ -472,10 +488,10 @@ def cancel_reservation(context: UserAccountContext, reservation_id: str) -> str:
         reservation_id: The unique Reservation ID (e.g., RES-12345)
     """
     r_id = reservation_id.strip().upper()
-    if r_id not in RESERVATIONS_STORE:
+    if r_id not in _reservations():
         return f"❌ Reservation ID '{reservation_id}' not found."
 
-    res = RESERVATIONS_STORE[r_id]
+    res = _reservations()[r_id]
     if res["status"] == "cancelled":
         return f"⚠️ Reservation '{r_id}' is already cancelled."
 
@@ -494,10 +510,10 @@ def change_reservation(context: UserAccountContext, reservation_id: str, new_dat
         new_guests: The new number of guests (e.g., 2)
     """
     r_id = reservation_id.strip().upper()
-    if r_id not in RESERVATIONS_STORE:
+    if r_id not in _reservations():
         return f"❌ Reservation ID '{reservation_id}' not found."
 
-    res = RESERVATIONS_STORE[r_id]
+    res = _reservations()[r_id]
     if res["status"] == "cancelled":
         return f"⚠️ Reservation '{r_id}' is already cancelled."
     res["date"] = new_date
@@ -531,7 +547,7 @@ def register_complaint(context: UserAccountContext, issue_description: str, depa
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    COMPLAINTS_STORE[comp_id] = comp_data
+    _complaints()[comp_id] = comp_data
 
     # Premium customers get instant escalation or discount voucher
     resolution = ""
@@ -559,10 +575,10 @@ def get_complaint_status(context: UserAccountContext, complaint_id: str) -> str:
         complaint_id: The unique Complaint ID (e.g., CMP-12345)
     """
     c_id = complaint_id.strip().upper()
-    if c_id not in COMPLAINTS_STORE:
+    if c_id not in _complaints():
         return f"❌ Complaint ID '{complaint_id}' not found."
 
-    comp = COMPLAINTS_STORE[c_id]
+    comp = _complaints()[c_id]
     return f"""
 🔍 **Complaint Investigation: {c_id}**
 👤 **Customer Name:** {comp['customer_name']}

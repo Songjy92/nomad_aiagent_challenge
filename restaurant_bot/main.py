@@ -1,5 +1,6 @@
 import sys
 import asyncio
+import uuid
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -30,50 +31,61 @@ def run_async(coro):
     return get_event_loop().run_until_complete(coro)
 
 
-async def load_user_name():
+async def load_user_name(session_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
-            CREATE TABLE IF NOT EXISTS user_settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                session_id TEXT,
+                key TEXT,
+                value TEXT NOT NULL,
+                PRIMARY KEY (session_id, key)
             )
             """
         )
         await db.commit()
         cursor = await db.execute(
-            "SELECT value FROM user_settings WHERE key = ?", ("user_name",)
+            "SELECT value FROM user_sessions WHERE session_id = ? AND key = ?",
+            (session_id, "user_name"),
         )
         row = await cursor.fetchone()
         return row[0] if row else None
 
 
-async def save_user_name(name):
+async def save_user_name(session_id: str, name: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
-            CREATE TABLE IF NOT EXISTS user_settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                session_id TEXT,
+                key TEXT,
+                value TEXT NOT NULL,
+                PRIMARY KEY (session_id, key)
             )
             """
         )
         await db.execute(
-            "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-            ("user_name", name),
+            "INSERT OR REPLACE INTO user_sessions (session_id, key, value) VALUES (?, ?, ?)",
+            (session_id, "user_name", name),
         )
         await db.commit()
 
 
+# ── 사용자 고유 세션 ID (브라우저 탭마다 독립적으로 생성) ──────────────────────
+if "user_session_id" not in st.session_state:
+    st.session_state["user_session_id"] = str(uuid.uuid4())
+
+user_session_id = st.session_state["user_session_id"]
+
 if "user_name" not in st.session_state:
-    st.session_state["user_name"] = run_async(load_user_name())
+    st.session_state["user_name"] = run_async(load_user_name(user_session_id))
 
 if st.session_state["user_name"] is None:
     st.title("어서오세요, 노마드 돼지집입니다!🐖")
     name_input = st.text_input("이름을 입력해주시면 대화를 시작하겠습니다:")
     if name_input.strip():
         st.session_state["user_name"] = name_input.strip()
-        run_async(save_user_name(name_input.strip()))
+        run_async(save_user_name(user_session_id, name_input.strip()))
         st.rerun()
     st.stop()
 
@@ -87,7 +99,7 @@ user_account_ctx = UserAccountContext(
 
 if "session" not in st.session_state:
     st.session_state["session"] = SQLiteSession(
-        "chat-history",
+        user_session_id,          # 사용자별 고유 세션 ID로 채팅 히스토리 분리
         "customer-support-memory.db",
     )
 session = st.session_state["session"]
@@ -173,7 +185,10 @@ if message:
 async def reset_all():
     await session.clear_session()
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("DELETE FROM user_settings WHERE key = 'user_name'")
+        await db.execute(
+            "DELETE FROM user_sessions WHERE session_id = ?",
+            (user_session_id,),
+        )
         await db.commit()
 
 
@@ -183,5 +198,8 @@ with st.sidebar:
         run_async(reset_all())
         st.session_state["user_name"] = None
         st.session_state["agent"] = triage_agent
+        st.session_state.pop("orders_store", None)
+        st.session_state.pop("reservations_store", None)
+        st.session_state.pop("complaints_store", None)
         st.rerun()
     st.write(run_async(session.get_items()))
